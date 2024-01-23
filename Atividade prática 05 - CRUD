@@ -1,0 +1,125 @@
+Instale o Flask e a biblioteca Flask-SQLAlchemy:
+pip install Flask Flask-SQLAlchemy
+
+Crie o arquivo app.py com o código do back-end:
+from flask import Flask, render_template, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'  # Usando SQLite como banco de dados
+db = SQLAlchemy(app)
+
+# Modelo para a tabela 'usuarios' no banco de dados
+class Usuario(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(50), nullable=False)
+
+# Rota para a página inicial
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+# Rota para listar todos os usuários
+@app.route('/api/usuarios', methods=['GET'])
+def listar_usuarios():
+    usuarios = Usuario.query.all()
+    usuarios_json = [{'id': u.id, 'nome': u.nome} for u in usuarios]
+    return jsonify(usuarios_json)
+
+# Rota para adicionar um novo usuário
+@app.route('/api/usuarios', methods=['POST'])
+def adicionar_usuario():
+    dados = request.get_json()
+    novo_usuario = Usuario(nome=dados['nome'])
+    db.session.add(novo_usuario)
+    db.session.commit()
+    return jsonify({'mensagem': 'Usuário adicionado com sucesso!'})
+
+# Rota para atualizar um usuário
+@app.route('/api/usuarios/<int:id>', methods=['PUT'])
+def atualizar_usuario(id):
+    usuario = Usuario.query.get(id)
+    if usuario:
+        dados = request.get_json()
+        usuario.nome = dados['nome']
+        db.session.commit()
+        return jsonify({'mensagem': 'Usuário atualizado com sucesso!'})
+    else:
+        return jsonify({'erro': 'Usuário não encontrado'}), 404
+
+# Rota para deletar um usuário
+@app.route('/api/usuarios/<int:id>', methods=['DELETE'])
+def deletar_usuario(id):
+    usuario = Usuario.query.get(id)
+    if usuario:
+        db.session.delete(usuario)
+        db.session.commit()
+        return jsonify({'mensagem': 'Usuário deletado com sucesso!'})
+    else:
+        return jsonify({'erro': 'Usuário não encontrado'}), 404
+
+if __name__ == '__main__':
+    # Cria as tabelas no banco de dados antes de iniciar o servidor
+    db.create_all()
+    app.run(debug=True)
+
+Crie o arquivo templates/index.html com o código do front-end:
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manipulação de Dados</title>
+</head>
+<body>
+    <h1>Manipulação de Dados</h1>
+
+    <!-- Formulário para adicionar um novo usuário -->
+    <form id="formAdicionar">
+        <label for="nome">Nome:</label>
+        <input type="text" id="nome" required>
+        <button type="submit">Adicionar Usuário</button>
+    </form>
+
+    <!-- Lista de usuários -->
+    <ul id="listaUsuarios"></ul>
+
+    <!-- Script para manipular dados com JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        // Função para carregar e exibir a lista de usuários
+        function carregarUsuarios() {
+            axios.get('/api/usuarios')
+                .then(response => {
+                    const listaUsuarios = document.getElementById('listaUsuarios');
+                    listaUsuarios.innerHTML = '';
+                    response.data.forEach(usuario => {
+                        const li = document.createElement('li');
+                        li.textContent = `ID: ${usuario.id}, Nome: ${usuario.nome}`;
+                        listaUsuarios.appendChild(li);
+                    });
+                })
+                .catch(error => console.error('Erro ao carregar usuários:', error));
+        }
+
+        // Função para adicionar um novo usuário
+        function adicionarUsuario(event) {
+            event.preventDefault();
+            const nome = document.getElementById('nome').value;
+            axios.post('/api/usuarios', { nome })
+                .then(response => {
+                    console.log(response.data);
+                    carregarUsuarios();
+                })
+                .catch(error => console.error('Erro ao adicionar usuário:', error));
+        }
+
+        // Adiciona um ouvinte de evento para o envio do formulário
+        document.getElementById('formAdicionar').addEventListener('submit', adicionarUsuario);
+
+        // Carrega a lista de usuários ao carregar a página
+        carregarUsuarios();
+    </script>
+</body>
+</html>
